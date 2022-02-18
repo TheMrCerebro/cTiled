@@ -23,5 +23,4 @@ visually show what shapes it has and how they could be used.
 <b>Tilesets</b> - This example shows how several different tileset can be used on the same map to add
 more images, effects or animations.
 
-
 Too easy!
