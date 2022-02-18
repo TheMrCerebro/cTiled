@@ -1,0 +1,731 @@
+'*********************************************************************
+'Copyright (c) 2021-2022 TheMrCerebro
+'themrcerebro@gmail.com
+'
+'cTiled - Zlib license.
+'
+'This software is provided 'as-is', without any express or
+'implied warranty. In no event will the authors be held
+'liable for any damages arising from the use of this software.
+'
+'Permission is granted to anyone to use this software for any purpose,
+'including commercial applications, and to alter it and redistribute
+'it freely, subject to the following restrictions:
+'
+'1. The origin of this software must not be misrepresented;
+'you must not claim that you wrote the original software.
+'If you use this software in a product, an acknowledgment
+'in the product documentation would be appreciated but
+'is not required.
+'
+'2. Altered source versions must be plainly marked as such,
+'and must not be misrepresented as being the original software.
+'
+'3. This notice may not be removed or altered from any
+'source distribution.
+'*********************************************************************
+
+#TEXT_FILES+="|*.tmx|*.tsx"
+
+Import mojo
+Import xml
+             
+' Shapes
+Enumerate eRECT, eELLIPSE, ePOINT, ePOLYGON
+
+Class cPROPERTY
+	Field boolValue:Bool
+	Field intValue:Int
+	Field objectValue:Int
+	Field floatValue:Float
+	Field name:String
+	Field type:String
+	Field fileValue:String
+	Field stringValue:String
+	Field colorValue:Color
+End
+
+Class cTILE
+	Field id:Int
+	Field animation:=New List<cFRAME>
+	Field objectgroup:=New List<cOBJECTGROUP>
+End
+
+Class cFRAME
+	Field tileid:Int
+	Field duration:Int
+End
+
+'The TTileset class holds the image information for a tileset.
+Class cTILESET
+	Field firstgid:int
+	Field tileWidth:int
+	Field tileHeight:int
+	Field tileCount:int
+	Field columns:Int
+	Field source:string
+	Field name:String
+	Field image:Image
+	Field tile:=New List<cTILE>
+End
+
+'The TLayer class holds all the layer data for the map for a particular layer.
+Class cLAYER
+	Field id:int
+	Field name:string
+	Field width:int
+	Field height:int
+	Field data:=New List<Int>
+	Field properties:=New List<cPROPERTY>
+	Field tintColor:Color
+End
+
+'The TObject class holds the data for all the objects in an ObjectGroup. It's parent class is TObjectGroup
+Class cOBJECT
+	Field id%
+	Field gid%
+	Field x%,y%
+	Field width%,height%
+	Field rotation#
+	Field properties:=New List<cPROPERTY>
+	Field shape:Int
+	Field points:=New List<cVECTOR>
+End
+
+'The TObjectGroup class holds all the ObjectGroups. It's parent class is TMap
+Class cOBJECTGROUP
+	Field id%
+	Field name$
+	Field object:=New List<cOBJECT>
+	Field properties:=New List<cPROPERTY>
+	Field tintColor:Color
+End
+
+Class cGROUP
+	Field id:int
+	Field name:String
+	Field properties:=New List<cPROPERTY>
+End
+
+Class cIMAGELAYER
+	Field id:Int
+	Field name:String
+	Field tintColor:Color
+End
+
+Class cVECTOR
+	Field x:Int
+	Field y:Int
+	Method New(x:Int,y:Int)
+		Self.x=x
+		Self.y=y
+	end
+end
+
+'This is the main class for bit.tiled. Create an object using this class to load a tiled map and load the resources for that map into memory.
+Class CTILED
+
+	Field version:String
+	Field tiledVersion:String
+	Field orientation:String
+	field renderOrder:String
+	Field tileWidth:Int
+	Field tileHeight:Int
+	Field infinite:Int
+	Field nextLayerID:Int
+	Field nextObjectID:Int
+	Field width:int
+	Field height:int
+	Field backgroundColor:Color=New Color
+	Field tileset:=New List<cTILESET>
+	Field layer:=New List<cLAYER>
+	Field objectgroup:=New List<cOBJECTGROUP>
+	Field group:=New List<cGROUP>
+	Field imagelayer:=New List<cIMAGELAYER>
+	Field properties:=New List<cPROPERTY>
+
+	'Map holds all the data for the loaded file.
+	Method New( filePath:String )
+
+		#If CONFIG="debug"
+			Local Error:= New XMLError
+			Local xml:= ParseXML(LoadString(filePath), Error)
+			
+			If xml = Null And Error.error
+				Print Error.ToString()'error
+			Else
+		#Else
+			Local xml:= ParseXML(LoadString(filePath))
+			If xml
+		#Endif
+
+				'Lee los datos del mapa
+                version = xml.GetAttribute("version")
+                tiledVersion = xml.GetAttribute("tiledversion")
+                orientation = xml.GetAttribute("orientation")
+                renderOrder = xml.GetAttribute("renderorder")
+                infinite = Int(xml.GetAttribute("infinite"))
+                nextLayerID = Int(xml.GetAttribute("nextlayerid"))
+                nextObjectID = Int(xml.GetAttribute("nextobjectid"))
+				width = Int(xml.GetAttribute("width"))
+				height = Int(xml.GetAttribute("height"))
+				tileWidth = Int(xml.GetAttribute("tilewidth"))
+				tileHeight = Int(xml.GetAttribute("tileheight"))
+				backgroundColor = HEX2RGB(xml.GetAttribute("backgroundcolor"))
+
+				#if CONFIG="debug"
+				DebugLog("MAP[*]")
+				DebugLog("- Version: "+version)
+				DebugLog("- Tiled Version: "+tiledVersion)
+				DebugLog("- Orientation: "+orientation)
+				DebugLog("- Render Order: "+renderOrder)
+				DebugLog("- Width: "+width)
+				DebugLog("- Height: "+height)
+				DebugLog("- Tile Width: "+tileWidth)
+				DebugLog("- Tile Height: "+tileHeight)
+				DebugLog("- Infinite: "+infinite)
+				DebugLog("- Next Layer ID: "+nextLayerID)
+				DebugLog("- Next Object ID: "+nextObjectID)
+				DebugLog("- Background Color: "+backgroundColor.r+","+backgroundColor.g+","+backgroundColor.b)
+				#Endif
+					
+				' Read all Properties
+				properties = readProperties(xml)
+				
+				' Read all Tilesets
+				Local xmlTileset:XMLNode = xml.GetChild("tileset")
+				While xmlTileset.valid
+					tileset.AddLast(readTilesets(xmlTileset))
+					xmlTileset = xmlTileset.GetNextSibling("tileset")
+				Wend
+				
+				' Read all Layers
+				Local xmlLayer:XMLNode = xml.GetChild("layer")
+				While xmlLayer.valid
+					layer.AddLast(readLayers(xmlLayer))
+					xmlLayer = xmlLayer.GetNextSibling("layer")
+				Wend
+
+				' Read all Object Groups
+				Local xmlObjectGroup:XMLNode = xml.GetChild("objectgroup")
+				While xmlObjectGroup.valid
+					objectgroup.AddLast(readObjectGroups(xmlObjectGroup))
+					xmlObjectGroup = xmlObjectGroup.GetNextSibling("objectgroup")
+				Wend
+				
+				' Read all Image Layers
+				Local xmlImageLayer:XMLNode = xml.GetChild("imagelayer")
+				While xmlImageLayer.valid
+					imagelayer.AddLast(readImageLayers(xmlImageLayer))
+					xmlImageLayer = xmlImageLayer.GetNextSibling("imagelayer")
+				Wend
+				
+				' Read all Groups
+				Local xmlGroup:XMLNode = xml.GetChild("group")
+				While xmlGroup.valid
+					group.AddLast(readGroups(xmlGroup))
+					xmlGroup = xmlGroup.GetNextSibling("group")
+				Wend
+		
+			Endif
+		
+	End
+	
+	' Read all Tilesets
+	Method readTilesets:cTILESET( xml:XMLNode )
+	
+		Local ts:cTILESET = New cTILESET
+					
+    	ts.firstgid = Int(xml.GetAttribute("firstgid"))
+    	ts.source = xml.GetAttribute("source")
+    	
+    	If ts.source.Length>0
+    	
+ 			#If CONFIG="debug"
+   			Local Error:= New XMLError
+    		Local tsx:= ParseXML(LoadString(ts.source), Error)
+    		
+			If tsx = Null And Error.error
+				Print Error.ToString()'error
+			Else
+			#Else
+			Local tsx:= ParseXML(LoadString(ts.source))
+			If tsx
+			#Endif
+			
+    			ts.tileWidth = Int(tsx.GetAttribute("tilewidth"))
+    			ts.tileHeight = Int(tsx.GetAttribute("tileheight"))
+    			ts.tileCount = Int(tsx.GetAttribute("tilecount"))
+    			ts.columns = Int(tsx.GetAttribute("columns"))
+	
+	      		#If CONFIG="debug"
+				DebugLog("~nTILESET[*]");
+				DebugLog("- First GID: "+ts.firstgid);
+				DebugLog("- Source: "+ts.source);
+				DebugLog("- Tile Width: "+ts.tileWidth);
+				DebugLog("- Tile Height: "+ts.tileHeight);
+				DebugLog("- Tile Count: "+ts.tileCount);
+				DebugLog("- Columns: "+ts.columns);
+				#Endif
+			
+    			'Lee los datos de la imagen utilizada
+    			Local xmlImage:XMLNode = tsx.GetChild("image")
+    			ts.image = LoadImage(xmlImage.GetAttribute("source"),ts.tileWidth,ts.tileHeight,ts.tileCount)
+    			
+    			' Read Tile information
+				Local xmlTile:XMLNode = tsx.GetChild("tile")
+				While xmlTile.valid
+
+					Local tld:cTILE = New cTILE
+						
+					tld.id = Int(xmlTile.GetAttribute("id"))
+
+					#if CONFIG="debug"
+					DebugLog("~nTILE [*]")
+					DebugLog("- ID: "+tld.id)
+					#endif
+
+					' Read Object Groups information
+					tld.objectgroup.AddLast(readObjectGroups(xmlTile))
+
+					' Read the Animation
+					Local xmlAnimation:XMLNode = xmlTile.GetChild("animation")
+						
+					#if CONFIG="debug"
+					DebugLog("~nANIMATION [*]")
+					#Endif
+									
+					' Read all Frames					
+					Local xmlFrame:XMLNode = xmlAnimation.GetChild("frame")
+					While xmlFrame.valid
+						
+						Local frm:cFRAME = New cFRAME
+
+						frm.tileid = Int(xmlFrame.GetAttribute("tileid"))
+						frm.duration = Int(xmlFrame.GetAttribute("duration"))
+
+						#if CONFIG="debug"
+						DebugLog("~nFRAME [*]")
+						DebugLog("- TileID: "+frm.tileid)
+						DebugLog("- Duration: "+frm.duration)
+						#endif
+
+						tld.animation.AddLast(frm)
+
+						'next item
+						xmlFrame = xmlFrame.GetNextSibling("frame")
+			
+					Wend
+
+					ts.tile.AddLast(tld)
+						
+					'next item
+					xmlTile = xmlTile.GetNextSibling("tile")
+			
+				Wend
+			
+			endif
+
+    	Else
+    	
+    	    ts.name = xml.GetAttribute("name")
+       		ts.tileWidth = Int(xml.GetAttribute("tilewidth"))
+    		ts.tileHeight = Int(xml.GetAttribute("tileheight"))
+    		ts.tileCount = Int(xml.GetAttribute("tilecount"))
+       		ts.columns = Int(xml.GetAttribute("columns"))
+       				
+      		#if CONFIG="debug"
+			DebugLog("~nTILESET[*]");
+			DebugLog("- First GID: "+ts.firstgid);
+			DebugLog("- Source: "+ts.source);
+			DebugLog("- Name: "+ts.name);
+			DebugLog("- Tile Width: "+ts.tileWidth);
+			DebugLog("- Tile Height: "+ts.tileHeight);
+			DebugLog("- Tile Count: "+ts.tileCount);
+			DebugLog("- Columns: "+ts.columns);
+			#Endif
+			
+    		'Lee los datos de la imagen utilizada
+    		Local xmlImage:XMLNode = xml.GetChild("image")
+    		ts.image = LoadImage(xmlImage.GetAttribute("source"),ts.tileWidth,ts.tileHeight,ts.tileCount)
+		
+		endif
+    				
+    	Return ts
+
+	End
+
+	' Read all Image Layers
+	Method readImageLayers:cIMAGELAYER( xml:XMLNode )
+
+		Local iml:cIMAGELAYER = New cIMAGELAYER
+
+		iml.id = Int(xml.GetAttribute("id"))
+		iml.name = xml.GetAttribute("name")
+		iml.tintColor = HEX2RGB(xml.GetAttribute("tintcolor"))
+
+		#if CONFIG="debug"
+		DebugLog("~nIMAGE LAYER[*]")
+		DebugLog("- ID: "+iml.id)
+		DebugLog("- Name: "+iml.name)
+		DebugLog("- Tint Color: "+iml.tintColor.r+" "+iml.tintColor.g+" "+iml.tintColor.b)
+		#endif
+
+		Return iml
+
+	end
+	
+	' Read all Groups
+	Method readGroups:cGROUP( xml:XMLNode )
+
+		Local grp:cGROUP = New cGROUP
+
+		grp.id = Int(xml.GetAttribute("id"))
+		grp.name = xml.GetAttribute("name")
+
+		#if CONFIG="debug"
+		DebugLog("~nGROUP[*]")
+		DebugLog("- ID: "+grp.id)
+		DebugLog("- Name: "+grp.name)
+		#endif
+
+		' Read all Properties
+		grp.properties = readProperties(xml)
+
+		' Read all Layers
+		Local xmlLayer:XMLNode = xml.GetChild("layer")
+		While xmlLayer.valid
+			layer.AddLast(readLayers(xmlLayer))
+			xmlLayer = xmlLayer.GetNextSibling("layer")
+		Wend
+
+		' Read all Object Groups
+		Local xmlObjectGroup:XMLNode = xml.GetChild("objectgroup")
+		While xmlObjectGroup.valid
+			objectgroup.AddLast(readObjectGroups(xmlObjectGroup))
+			xmlObjectGroup = xmlObjectGroup.GetNextSibling("objectgroup")
+		Wend
+
+		' Read all Image Layers
+		Local xmlImageLayer:XMLNode = xml.GetChild("imagelayer")
+		While xmlImageLayer.valid
+			imagelayer.AddLast(readImageLayers(xmlImageLayer))
+			xmlImageLayer = xmlImageLayer.GetNextSibling("imagelayer")
+		Wend
+
+		' Read all Groups
+		Local xmlGroup:XMLNode = xml.GetChild("group")
+		While xmlGroup.valid
+			group.AddLast(readGroups(xmlGroup))
+			xmlGroup = xmlGroup.GetNextSibling("group")
+		Wend
+
+		return grp
+
+	End
+
+	' Read all Layers
+	Method readLayers:cLAYER( xml:XMLNode )
+	
+		Local lyr:cLAYER = New cLAYER
+					
+		lyr.id = Int(xml.GetAttribute("id"))
+		lyr.name = xml.GetAttribute("name")
+		lyr.width = Int(xml.GetAttribute("width"))
+		lyr.height = Int(xml.GetAttribute("height"))
+		lyr.tintColor = HEX2RGB(xml.GetAttribute("tintcolor"))
+		
+		#if CONFIG="debug"
+		DebugLog("~nLAYER[*]")
+		DebugLog("- ID: "+lyr.id)
+		DebugLog("- Name: "+lyr.name)
+		DebugLog("- Width: "+lyr.width)
+		DebugLog("- Height: "+lyr.height)
+		DebugLog("- Tint Color: "+lyr.tintColor.r+" "+lyr.tintColor.g+" "+lyr.tintColor.b)
+		#Endif
+		
+		' Read all properties
+		lyr.properties = readProperties(xml)
+					
+		' Read all data
+		Local xmlData:XMLNode = xml.GetChild("data")
+
+		Select xmlData.GetAttribute("encoding")
+		
+		Case "csv" ' CSV
+		
+			#if CONFIG="debug"
+		    DebugLog("- Encoding: CSV")
+		    #endif
+		    		
+			Local in:string[] = xmlData.value.Split(",")
+							
+			For Local i:int=0 Until in.Length()
+				lyr.data.AddLast(Int(in[i]))
+			Next
+    	
+    	Case "base64" ' BASE64
+    	
+    		#if CONFIG="debug"
+    	    DebugLog("- Encoding: BASE64")
+    	    #endif
+
+			Local out:String
+
+			Local in:String = xmlData.value
+			in = in.Replace("~n","")
+			in = in.Replace("~r","")
+			in = in.Replace(" ","")
+
+			Local T:Int[256]
+		    For Local i:Int=0 Until 64
+		    	T[ "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"[i] ] = i
+		    next
+
+		    Local val:Int, valb:Int = -8
+		    For Local i:Int=0 Until in.Length
+		    
+		        If T[ in[i] ] = -1 Then Exit
+		        
+		        val = (val Shl 6) + T[ in[i] ]
+		        valb += 6
+		        
+		        if valb >= 0
+		            out += String.FromChar((val Shr valb) & $FF )
+		            valb -= 8
+		        Endif
+		        
+		    Next
+    
+    		Local p:Int[] = out.ToChars
+			For Local i:Int=0 Until out.Length() Step 4
+				lyr.data.AddLast(p[i])
+			Next
+		    
+    	Default ' XML
+    	
+    		#if CONFIG="debug"
+    		DebugLog("- Encoding: XML")
+    		#Endif
+    
+			Local xmlTile:XMLNode = xmlData.GetChild("tile")
+			While xmlTile.valid
+				lyr.data.AddLast(Int(xmlTile.GetAttribute("gid")))
+				xmlTile = xmlTile.GetNextSibling("tile")
+			wend
+			
+		end
+
+		Return lyr
+					
+	End
+
+	' Read all Object Groups
+	Method readObjectGroups:cOBJECTGROUP( xml:XMLNode )
+				
+		Local og:cOBJECTGROUP = New cOBJECTGROUP
+				
+		og.id = Int(xml.GetAttribute("id"))
+		og.name = xml.GetAttribute("name")
+		og.tintColor = HEX2RGB(xml.GetAttribute("tintcolor"))
+				
+		#if CONFIG="debug"
+		DebugLog("~nOBJECT GROUP[*]")
+		DebugLog("- ID: "+og.id)
+		DebugLog("- Name: "+og.name)
+		DebugLog("- Tint Color: "+og.tintColor.r+","+og.tintColor.g+","+og.tintColor.b)
+		#Endif
+		
+		' Read all properties
+		og.properties = readProperties(xml)
+			
+		Local xmlObject:XMLNode = xml.GetChild("object")
+		While xmlObject.valid
+					
+			Local obj:cOBJECT = New cOBJECT
+		
+			obj.id = Int(xmlObject.GetAttribute("id"))
+			obj.x = Int(xmlObject.GetAttribute("x"))
+			obj.y = Int(xmlObject.GetAttribute("y"))
+			obj.width = Int(xmlObject.GetAttribute("width"))
+			obj.height = Int(xmlObject.GetAttribute("height"))
+			obj.shape = eRECT
+			
+			#if CONFIG="debug"
+			DebugLog("~nOBJECT[*]")
+			DebugLog("- ID: "+obj.id)
+			DebugLog("- X: "+obj.x)
+			DebugLog("- Y: "+obj.y)
+			DebugLog("- Rotation: "+obj.rotation)
+			DebugLog("- Width: "+obj.width)
+			DebugLog("- Height: "+obj.height)
+			#Endif
+		
+			If xmlObject.GetChild("ellipse").valid Then obj.shape = eELLIPSE
+			
+			If xmlObject.GetChild("point").valid Then obj.shape = ePOINT
+		
+			If xmlObject.GetChild("polygon").valid
+
+				obj.shape = ePOLYGON
+				
+				Local ac:String[] = xmlObject.GetChild("polygon").GetAttribute("points").Split(" ")
+
+				For Local i:Int=0 Until ac.Length()
+					
+					Local pos:String[] = ac[i].Split(",")
+					obj.points.AddLast(new cVECTOR( Int(pos[0]), Int(pos[1]) ))
+
+				Next
+
+			Endif
+			
+			#If CONFIG="debug"
+    		Select obj.shape
+    		Case eELLIPSE
+    		DebugLog("- Shape: Ellipse")
+    		Case ePOINT
+    		DebugLog("- Shape: Point")
+    		Case ePOLYGON
+    		DebugLog("- Shape: Polygon")
+    		For Local pos:=Eachin obj.points
+			DebugLog("- Point: "+pos.x+","+pos.y)
+			next
+    		Default
+    		DebugLog("- Shape: Rectangle")
+    		end
+			#Endif
+			
+			' Read all properties
+			obj.properties = readProperties(xmlObject)
+			
+			'
+			og.object.AddLast(obj)
+		
+			'next item
+			xmlObject = xmlObject.GetNextSibling("object")
+			
+		Wend
+
+		Return og
+
+	End
+
+	' Load all properties
+	Method readProperties:List<cPROPERTY>( xml:XMLNode )
+	
+		Local pro:=New List<cPROPERTY>
+		
+		Local xmlProperties:XMLNode = xml.GetChild("properties")
+
+		Local xmlProperty:XMLNode = xmlProperties.GetChild("property")
+		While xmlProperty.valid
+		
+			Local pry:=New cPROPERTY
+			
+			pry.name = xmlProperty.GetAttribute("name")
+			pry.type= xmlProperty.GetAttribute("type")
+			
+			#If CONFIG="debug"
+			DebugLog("~nPROPERTY [*]")
+			DebugLog("- Name: "+pry.name)
+			DebugLog("- Type: "+pry.type)
+			#endif
+			
+			If pry.type = "bool"
+			
+				If xmlProperty.GetAttribute("value") = "true" Then pry.boolValue = True Else pry.boolValue = false
+				
+				#If CONFIG="debug"
+				If pry.boolValue Then DebugLog("- Value: True") Else DebugLog("- Value: False")
+				#Endif
+				
+			Else If pry.type = "float"
+			
+				pry.floatValue = Float(xmlProperty.GetAttribute("value"))
+				
+				#if CONFIG="debug"
+				DebugLog("- Value: "+pry.floatValue)
+				#endif
+	
+			Else If pry.type = "int"
+			
+				pry.intValue = Int(xmlProperty.GetAttribute("value"))
+				
+				#If CONFIG="debug"
+				DebugLog("- Value: "+pry.intValue)
+				#endif
+	
+			else if pry.type = "object"
+
+				pry.objectValue = Int(xmlProperty.GetAttribute("value"))
+				
+				#if CONFIG="debug"
+				DebugLog("- alue: "+pry.objectValue)
+				#endif
+
+			else if pry.type = "file"
+
+				pry.fileValue = xmlProperty.GetAttribute("value")
+				
+				#if CONFIG="debug"
+				DebugLog("- Value: "+pry.fileValue)
+				#endif
+
+			else if pry.type = "color"
+
+				pry.colorValue = HEX2RGB(xmlProperty.GetAttribute("value"))
+				
+				#if CONFIG="debug"
+				DebugLog("- Value: "+pry.colorValue.r+","+pry.colorValue.g+","+pry.colorValue.b)
+				#endif
+
+			Else
+			
+				pry.stringValue = xmlProperty.GetAttribute("value")
+				
+				#if CONFIG="debug"
+				DebugLog("- Value: "+pry.stringValue);
+				#Endif
+				
+			endif
+					
+			pro.AddLast(pry)
+			
+			'next item
+			xmlProperty = xmlProperty.GetNextSibling("property")
+			
+		Wend
+
+		Return pro
+
+	End
+
+Private
+
+	Function HEX2RGB:Color(val:string)
+	
+		Local col:Color=New Color(255,255,255)
+
+		val = val.Replace("#","")
+		
+		If val.Length>0
+
+			Local out:Int, i:int
+			While (i<val.Length)
+
+				out Shl= 4
+				If (val[i] < 65) Then out += (val[i] & $F) Else out += (val[i] & $7) + 9
+				i += 1
+				
+			wend
+
+			col.Set(out)
+			
+		Endif
+		
+		Return col
+
+	End
+
+End

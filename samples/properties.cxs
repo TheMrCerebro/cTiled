@@ -1,0 +1,113 @@
+'*********************************************************************
+'Copyright (c) 2021-2022 TheMrCerebro
+'themrcerebro@gmail.com
+'
+'cTiled - Zlib license.
+'
+'This software is provided 'as-is', without any express or
+'implied warranty. In no event will the authors be held
+'liable for any damages arising from the use of this software.
+'
+'Permission is granted to anyone to use this software for any purpose,
+'including commercial applications, and to alter it and redistribute
+'it freely, subject to the following restrictions:
+'
+'1. The origin of this software must not be misrepresented;
+'you must not claim that you wrote the original software.
+'If you use this software in a product, an acknowledgment
+'in the product documentation would be appreciated but
+'is not required.
+'
+'2. Altered source versions must be plainly marked as such,
+'and must not be misrepresented as being the original software.
+'
+'3. This notice may not be removed or altered from any
+'source distribution.
+'*********************************************************************
+
+Import ctiled
+
+Function Main()
+	New Game()
+End
+
+Class Game Extends App
+
+	'Constructor
+	Method OnCreate()
+
+    	tld = New CTILED("properties.tmx")
+
+	End
+
+	Method OnUpdate()
+	
+	End
+	
+    Method OnRender()
+    
+		Cls(0,0,0)
+       
+		' Extracts data from all tile sets.
+		For Local ts:=Eachin tld.tileset
+
+			' Extracts data from all layers.
+			For Local lyr:=Eachin tld.layer
+
+				For Local d:int=0 Until lyr.data.Count
+			
+					' Tile position.
+					Local x:int = d Mod lyr.width
+					Local y:Int = d / lyr.width
+				
+					Local id:Int = lyr.data.ToArray[y*lyr.width+x] - ts.firstgid
+				
+					' Draw the tile.
+					If id>=0 Then DrawImage(ts.image, x * tld.tileWidth, y * tld.tileHeight, id)   
+
+				Next
+				
+			Next
+			
+		Next
+		
+		' Extracts data from all groups of objects.
+        For Local og:=Eachin tld.objectgroup
+
+            ' Extract data from all objects.
+            For Local obj:=Eachin og.object
+
+                ' Extracts the position and the size of the object.
+				Local x = obj.x
+                local y = obj.y
+                local w = obj.width
+                local h = obj.height
+
+                ' If the object group name equals "box"...
+                if og.name = "box"
+
+                    ' Extract data from all properties.
+                    For Local pro:=Eachin obj.properties
+
+                        Local col:Color = New Color
+                        If pro.type = "color" Then col = pro.colorValue
+
+                        ' Draw rectangles following what the properties indicate.
+                        SetColor(col.r,col.g,col.b)
+                        DrawRect(x,y,w,h)
+
+                    Next
+                    
+                endif
+            
+            next
+        
+        next
+
+	End
+	
+Private
+
+	Field tld:CTILED
+	
+end

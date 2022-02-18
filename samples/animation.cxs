@@ -1,0 +1,116 @@
+'*********************************************************************
+'Copyright (c) 2021-2022 TheMrCerebro
+'themrcerebro@gmail.com
+'
+'cTiled - Zlib license.
+'
+'This software is provided 'as-is', without any express or
+'implied warranty. In no event will the authors be held
+'liable for any damages arising from the use of this software.
+'
+'Permission is granted to anyone to use this software for any purpose,
+'including commercial applications, and to alter it and redistribute
+'it freely, subject to the following restrictions:
+'
+'1. The origin of this software must not be misrepresented;
+'you must not claim that you wrote the original software.
+'If you use this software in a product, an acknowledgment
+'in the product documentation would be appreciated but
+'is not required.
+'
+'2. Altered source versions must be plainly marked as such,
+'and must not be misrepresented as being the original software.
+'
+'3. This notice may not be removed or altered from any
+'source distribution.
+'*********************************************************************
+
+Import ctiled
+
+Function Main()
+	New Game()
+End
+
+Class Game Extends App
+
+	Field tld:CTILED
+	
+	Field currentFrameIndex:int
+	Field currentFrameTime:float
+	
+	'Constructor
+	Method OnCreate()
+
+		SetUpdateRate(30)
+	
+    	tld = New CTILED("animation.tmx")
+
+	End
+	
+    Method OnRender()
+    
+		Cls(0,0,0)
+       
+		' Extracts data from all tile sets.
+		For Local ts:=Eachin tld.tileset
+
+			' Extracts data from all layers.
+			For Local lyr:=Eachin tld.layer
+
+				For Local d:int=0 Until lyr.data.Count
+				
+					Local id:Int = lyr.data.ToArray[d] - ts.firstgid
+				
+					' Draw the tile.
+					If id>=0
+													
+						' Tile position.
+						Local x:int = (d Mod lyr.width) * tld.tileWidth
+						Local y:Int = (d / lyr.width) * tld.tileHeight
+					
+						DrawImage(ts.image, x, y, id)   
+
+						' This zone corresponds to the tiles extracted when using an external tileset.
+						' In this case, the animation data they contain will be used.
+						For Local tl:=Eachin ts.tile
+
+							' In this way it is possible to make some tiles animated.
+							' Sure there are other ways, this is just an example.
+							If tl.id = id And tl.animation.Count()>0
+
+								currentFrameTime += 0.5
+
+								Local tileID:Int = tl.animation.ToArray()[currentFrameIndex].tileid
+								local duration:Int = tl.animation.ToArray()[currentFrameIndex].duration
+
+								if currentFrameTime >= duration
+
+									currentFrameTime = 0
+
+									if currentFrameIndex = (tl.animation.Count() - 1)
+										currentFrameIndex = 0
+									else
+										currentFrameIndex += 1
+									Endif
+									
+								endif
+
+								' Draw the animation.
+								DrawImage(ts.image, x, y, tileID)
+								
+							Endif
+							
+						Next
+							
+					Endif
+					
+				Next
+				
+			Next
+			
+		next
+
+
+	End
+	
+end

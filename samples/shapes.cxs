@@ -1,0 +1,106 @@
+'*********************************************************************
+'Copyright (c) 2021-2022 TheMrCerebro
+'themrcerebro@gmail.com
+'
+'cTiled - Zlib license.
+'
+'This software is provided 'as-is', without any express or
+'implied warranty. In no event will the authors be held
+'liable for any damages arising from the use of this software.
+'
+'Permission is granted to anyone to use this software for any purpose,
+'including commercial applications, and to alter it and redistribute
+'it freely, subject to the following restrictions:
+'
+'1. The origin of this software must not be misrepresented;
+'you must not claim that you wrote the original software.
+'If you use this software in a product, an acknowledgment
+'in the product documentation would be appreciated but
+'is not required.
+'
+'2. Altered source versions must be plainly marked as such,
+'and must not be misrepresented as being the original software.
+'
+'3. This notice may not be removed or altered from any
+'source distribution.
+'*********************************************************************
+
+Import ctiled
+
+Function Main()
+	New Game()
+End
+
+Class Game Extends App
+
+	Field tld:CTILED
+	
+	'Constructor
+	Method OnCreate()
+
+    	tld = New CTILED("shapes.tmx")
+
+	End
+	
+    Method OnRender()
+    
+		Cls(0,0,0)
+       
+        ' Extracts data from all groups of objects.
+        For Local og:=Eachin tld.objectgroup
+
+            ' Extract data from all objects.
+            For Local obj:=Eachin og.Object
+
+                ' Extracts the position and the size of the object.
+                Local x:Int = obj.x
+                Local y:Int = obj.y
+                Local w:Int = obj.width
+                Local h:Int = obj.height
+
+                Select obj.shape
+
+                Case eRECT' Draw rectangles.
+                
+                	SetColor(255,0,0)
+                	DrawRect(x, y, w, h)
+  
+                Case eELLIPSE' Draw circles.You should draw ellipses with different sizes but for now you can't do that.
+            
+                	SetColor(0, 255, 0)
+                    DrawOval(x, y, w, h)
+ 
+                case ePOINT' Draw points.On this occasion to show them, I have used a crossand a circle.
+
+					SetColor(255, 0, 255)
+                    DrawOval(x, y, 8, 8)
+                    SetColor(255,255,0)
+                    DrawLine(x, y+4, x+8, y+4)
+                    DrawLine(x+4, y, x+4, y+8)
+
+                case ePOLYGON' Draw polygons using the information extracted from the attribute.
+
+					SetColor(0, 0, 255)
+                    For Local i:Int=0 until obj.points.Count()
+
+                        Local in:cVECTOR = New cVECTOR
+                        Local out:cVECTOR = New cVECTOR
+                        
+                        in = obj.points.ToArray()[i]
+                        
+                        If i = obj.points.Count()-1 Then out = obj.points.ToArray()[0] else out = obj.points.ToArray()[i + 1]
+
+                        ' Draw polygons using lines.
+                        DrawLine(x+in.x, y+in.y, x+out.x, y+out.y)
+                        
+                    next
+
+                End
+                
+            Next
+            
+        next
+
+	End
+	
+end
